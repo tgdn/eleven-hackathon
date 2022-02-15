@@ -1,4 +1,7 @@
+import os
 import logging
+from typing import List, Tuple
+import pandas as pd
 from eleven.scraper import Scraper
 
 logger = logging.getLogger(__name__)
@@ -9,8 +12,18 @@ class SkyTraxParser:
         self.scraper = scraper
 
     @classmethod
-    def run(cls, scraper: Scraper):
+    def run(cls, scraper: Scraper, airline_list: List[Tuple[str, str]] = None):
         self = cls(scraper)
+        if airline_list is None:
+            airline_list = self.get_airlines()
+
+        for airline, slug in airline_list:
+            articles = self.scrape_airline(slug)
+            df = pd.DataFrame(articles)
+            df["airline_slug"] = slug
+            df["airline"] = airline
+            # save as csv
+            df.to_csv(os.path.join("data", f"{slug}.csv"), index=False)
 
         return self
 
@@ -147,7 +160,7 @@ class SkyTraxParser:
                 article_count = int(
                     soup.find(itemprop="reviewCount").get_text().strip()
                 )
-            except ValueError:
+            except:
                 pass
             articles += self.parse_page(soup)
             page += 1
@@ -155,10 +168,13 @@ class SkyTraxParser:
                 break
 
         # stats
-        if article_count is not None:
-            percentage_dl = len(articles) / article_count
-            logger.info(
-                f"Imported {len(articles)} out of {article_count} ({percentage_dl:.2%})"
-            )
+        try:
+            if article_count is not None:
+                percentage_dl = len(articles) / article_count
+                logger.info(
+                    f"Imported {len(articles)} out of {article_count} ({percentage_dl:.2%})"
+                )
+        except:
+            pass
 
         return articles
